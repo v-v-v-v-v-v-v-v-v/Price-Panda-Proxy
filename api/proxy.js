@@ -4,7 +4,7 @@ import crypto from 'crypto';
 const OFFICIAL_API_GATEWAY = "https://api-sg.aliexpress.com/sync";
 const OFFICIAL_API_METHOD = "aliexpress.affiliate.product.query";
 const TRACKING_ID = "default";
-
+console.log(`Using Tracking ID: [${trackingId}]`);
 function generateAliexpressSignature(params, secretKey) {
     const sortedKeys = Object.keys(params).sort();
     const concatenatedString = sortedKeys.map(key => key + params[key]).join('');
