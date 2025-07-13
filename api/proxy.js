@@ -33,7 +33,6 @@ export default async function handler(request, response) {
         const appKey = process.env.ALIEXPRESS_APP_KEY;
         const secretKey = process.env.ALIEXPRESS_SECRET_KEY;
         const trackingId = process.env.ALIEXPRESS_TRACKING_ID || "default";
-        console.log(`Using Tracking ID: [${trackingId}]`);
 
         const { keywords, categoryId } = body;
 
