@@ -3,8 +3,7 @@ import crypto from 'crypto';
 
 const OFFICIAL_API_GATEWAY = "https://api-sg.aliexpress.com/sync";
 const OFFICIAL_API_METHOD = "aliexpress.affiliate.product.query";
-const TRACKING_ID = "default";
-console.log(`Using Tracking ID: [${trackingId}]`);
+
 function generateAliexpressSignature(params, secretKey) {
     const sortedKeys = Object.keys(params).sort();
     const concatenatedString = sortedKeys.map(key => key + params[key]).join('');
@@ -29,11 +28,13 @@ export default async function handler(request, response) {
     }
 
     try {
-      
         const body = request.body;
 
         const appKey = process.env.ALIEXPRESS_APP_KEY;
         const secretKey = process.env.ALIEXPRESS_SECRET_KEY;
+        const trackingId = process.env.ALIEXPRESS_TRACKING_ID || "default";
+        console.log(`Using Tracking ID: [${trackingId}]`);
+
         const { keywords, categoryId } = body;
 
         if (!appKey || !secretKey) {
@@ -46,9 +47,16 @@ export default async function handler(request, response) {
         
         const createApiCall = async (sortOrder) => {
             const params = {
-                'app_key': appKey, 'method': OFFICIAL_API_METHOD, 'sign_method': 'hmac-sha256',
-                'timestamp': String(Date.now()), 'keywords': keywords, 'tracking_id': TRACKING_ID,
-                'target_language': 'en', 'target_currency': 'USD', 'page_size': '50', 'sort': sortOrder,
+                'app_key': appKey,
+                'method': OFFICIAL_API_METHOD,
+                'sign_method': 'hmac-sha256',
+                'timestamp': String(Date.now()),
+                'keywords': keywords,
+                'tracking_id': trackingId, 
+                'target_language': 'en',
+                'target_currency': 'USD',
+                'page_size': '50',
+                'sort': sortOrder,
             };
             if (categoryId) { params.category_id = categoryId; }
             params.sign = generateAliexpressSignature(params, secretKey);
