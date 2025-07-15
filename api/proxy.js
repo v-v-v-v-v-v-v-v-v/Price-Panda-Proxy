@@ -15,7 +15,7 @@ function generateAliexpressSignature(params, secretKey) {
 }
 
 export default async function handler(request, response) {
-    response.setHeader('Access-Control-Allow-Origin', '*');
+    response.setHeader('Access-Control-Allow-Origin', 'chrome-extension://oaicdpnnbookbcenmgcemnfajpdcdpmm');
     response.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
     response.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
