@@ -1,11 +1,10 @@
-// api/proxy.js - The COMPLETE "8/10" Pure Signal Server with Rate Limiter
+// api/proxy.js - FINAL "Smart Hybrid" Version
 
-// --- A. IMPORTS & RATE LIMITER SETUP ---
 import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
 import crypto from 'crypto';
 
-// Initialize Redis and the Rate Limiter. This happens once when the server starts.
+// --- A. RATE LIMITER SETUP ---
 let ratelimit;
 if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
     const redis = new Redis({
@@ -14,13 +13,27 @@ if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) 
     });
     ratelimit = new Ratelimit({
         redis: redis,
-        limiter: Ratelimit.slidingWindow(10, "30 s"), // Your 10 requests per 30 seconds limit
+        limiter: Ratelimit.slidingWindow(10, "30 s"),
         analytics: true,
         prefix: "@price_panda_ratelimit",
     });
 }
 
-// --- B. HELPER FUNCTIONS ---
+// --- B. KNOWLEDGE BASE (Minimalist, for the Smart Filter only) ---
+const PRODUCT_NOUNS = new Set([
+    'case', 'cover', 'skin', 'charger', 'adapter', 'cable', 'powerbank', 'battery',
+    'mount', 'stand', 'holder', 'grip', 'tripod', 'headphones', 'earbuds', 'headset', 'speaker',
+    'screen', 'protector', 'film', 'glass', 'wallet', 'airpods'
+]);
+
+const PRODUCT_CONFLICT_MAP = new Map([
+    ['case', new Set(['screen', 'protector', 'film', 'glass', 'charger', 'cable', 'wallet', 'airpods', 'stand', 'holder', 'mount', 'grip', 'powerbank'])],
+    ['screen', new Set(['case', 'cover', 'charger', 'cable', 'wallet', 'airpods', 'stand', 'holder'])],
+    ['protector', new Set(['case', 'cover', 'charger', 'cable', 'wallet', 'airpods', 'stand', 'holder'])],
+    ['charger', new Set(['case', 'cover', 'screen', 'protector', 'film', 'glass', 'stand', 'holder', 'mount', 'grip'])]
+]);
+
+// --- C. HELPER FUNCTIONS ---
 const OFFICIAL_API_GATEWAY = "https://api-sg.aliexpress.com/sync";
 const OFFICIAL_API_METHOD = "aliexpress.affiliate.product.query";
 
@@ -39,16 +52,14 @@ const calculateSimilarity = (setA, setB) => {
     return unionSize === 0 ? 0 : intersectionSize / unionSize;
 };
 
-// --- C. MAIN SERVER HANDLER ---
+// --- D. MAIN SERVER HANDLER ---
 export default async function handler(request, response) {
-    // 1. APPLY RATE LIMITER (with "Fail Open" logic)
+    // 1. APPLY RATE LIMITER
     if (ratelimit) {
         const ip = request.ip ?? "127.0.0.1";
         try {
             const { success } = await ratelimit.limit(ip);
-            if (!success) {
-                return response.status(429).json({ error: "Too Many Requests" });
-            }
+            if (!success) { return response.status(429).json({ error: "Too Many Requests" }); }
         } catch (error) {
             console.error("Rate limiter error (failing open):", error);
         }
@@ -74,8 +85,8 @@ export default async function handler(request, response) {
 
         const titleKeywords = getKeywordSet(amazonTitle);
         const userQueryKeywords = getKeywordSet(amazonSearchQuery || '');
-        const combinedKeywords = new Set([...userQueryKeywords, ...titleKeywords]);
-        const searchApiQuery = userQueryKeywords.size > 2 ? amazonSearchQuery : [...combinedKeywords].slice(0, 7).join(' ');
+        const combinedAmazonKeywords = new Set([...userQueryKeywords, ...titleKeywords]);
+        const searchApiQuery = userQueryKeywords.size > 2 ? amazonSearchQuery : [...combinedAmazonKeywords].slice(0, 7).join(' ');
 
         // 3. CALL THE ALIEXPRESS API
         const params = {
@@ -85,18 +96,31 @@ export default async function handler(request, response) {
         };
         if (amazonCategory) { params.category_id = amazonCategory; }
         params.sign = generateAliexpressSignature(params, secretKey);
-
         const apiResponse = await fetch(OFFICIAL_API_GATEWAY, {
             method: 'POST', headers: { 'Content-Type': 'application/x-form-urlencoded;charset=utf-8' },
             body: new URLSearchParams(params)
         });
-
         if (!apiResponse.ok) { throw new Error('AliExpress API request failed'); }
         const data = await apiResponse.json();
         const allResults = data.aliexpress_affiliate_product_query_response?.resp_result?.result?.products?.product || [];
 
-        // 4. RUN THE "PURE SIGNAL" (8/10) RANKING ALGORITHM
-        let alternatives = allResults
+        // --- 4. THE "SMART HYBRID" ALGORITHM ---
+
+        // STAGE 1: THE SMART FILTER
+        const coreNoun = [...combinedAmazonKeywords].find(kw => PRODUCT_NOUNS.has(kw));
+        let candidates = allResults;
+
+        if (coreNoun && PRODUCT_CONFLICT_MAP.has(coreNoun)) {
+            const forbiddenProducts = PRODUCT_CONFLICT_MAP.get(coreNoun);
+            candidates = allResults.filter(item => {
+                const aliexpressTitle = item.product_title.toLowerCase();
+                return ![...forbiddenProducts].some(term => aliexpressTitle.includes(term));
+            });
+            console.log(`Smart Filter active for "${coreNoun}". Reduced ${allResults.length} to ${candidates.length} candidates.`);
+        }
+
+        // STAGE 2: THE "PURE SIGNAL" RANKING (Your 8/10 Algorithm)
+        let alternatives = candidates
             .map(item => {
                 const itemPriceNum = parseFloat(item.sale_price);
                 if (!(itemPriceNum > 0 && itemPriceNum < amazonPrice)) return null;
@@ -117,7 +141,7 @@ export default async function handler(request, response) {
         
         alternatives.sort((a, b) => b.score - a.score);
 
-        // 5. SEND THE FINAL, RANKED LIST BACK TO YOUR EXTENSION
+        // 5. SEND THE FINAL, RANKED LIST BACK
         return response.status(200).json({ results: alternatives });
 
     } catch (err) {
