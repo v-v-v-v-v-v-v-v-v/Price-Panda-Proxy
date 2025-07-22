@@ -3,6 +3,11 @@
   "version": "1.0.0",
   "description": "Proxy server for my Chrome extension API keys",
   "main": "index.js",
+  "dependencies": {
+    "@upstash/ratelimit": "^1.2.1",
+    "@upstash/redis": "^1.31.5",
+    "crypto-js": "^4.2.0"
+  },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
