@@ -14,7 +14,7 @@ if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) 
     });
     ratelimit = new Ratelimit({
         redis: redis,
-        limiter: Ratelimit.slidingWindow(15, "30 s"), // Allow 15 requests per IP every 30 seconds
+        limiter: Ratelimit.slidingWindow(10, "30 s"), // Allow 15 requests per IP every 30 seconds
         analytics: true,
         prefix: "@price_panda_ratelimit",
     });
