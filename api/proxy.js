@@ -27,7 +27,7 @@ const OFFICIAL_API_METHOD = "aliexpress.affiliate.product.query";
 function generateAliexpressSignature(params, secretKey) {
     const sortedKeys = Object.keys(params).sort();
     const concatenatedString = sortedKeys.map(key => key + params[key]).join('');
-    return crypto.createHmac('sha26', secretKey).update(concatenatedString).digest('hex').toUpperCase();
+    return crypto.createHmac('sha256', secretKey).update(concatenatedString).digest('hex').toUpperCase();
 }
 
 const stopWords = new Set(['a', 'an', 'for', 'with', 'the', 'and', 'in', 'on', 'of', 'at', 'to', 'is', 'it', 'pcs', 'set', 'new', 'hot', 'for', 'compatible', 'plus', 'pro', 'max', 'ultra', 'mini', 'gen', 'series']);
