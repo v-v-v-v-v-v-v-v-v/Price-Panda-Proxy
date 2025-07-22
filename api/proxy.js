@@ -1,4 +1,4 @@
-// api/proxy.js - FINAL VERSION with Rate Limiter and "Pure Signal" Ranking
+// api/proxy.js - The COMPLETE "8/10" Pure Signal Server with Rate Limiter
 
 // --- A. IMPORTS & RATE LIMITER SETUP ---
 import { Ratelimit } from "@upstash/ratelimit";
@@ -14,7 +14,7 @@ if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) 
     });
     ratelimit = new Ratelimit({
         redis: redis,
-        limiter: Ratelimit.slidingWindow(10, "30 s"), // Allow 15 requests per IP every 30 seconds
+        limiter: Ratelimit.slidingWindow(10, "30 s"), // Your 10 requests per 30 seconds limit
         analytics: true,
         prefix: "@price_panda_ratelimit",
     });
@@ -38,7 +38,6 @@ const calculateSimilarity = (setA, setB) => {
     const unionSize = new Set([...setA, ...setB]).size;
     return unionSize === 0 ? 0 : intersectionSize / unionSize;
 };
-
 
 // --- C. MAIN SERVER HANDLER ---
 export default async function handler(request, response) {
@@ -78,7 +77,7 @@ export default async function handler(request, response) {
         const combinedKeywords = new Set([...userQueryKeywords, ...titleKeywords]);
         const searchApiQuery = userQueryKeywords.size > 2 ? amazonSearchQuery : [...combinedKeywords].slice(0, 7).join(' ');
 
-        // 3. CALL THE ALIEXPRESS API (using your proven logic)
+        // 3. CALL THE ALIEXPRESS API
         const params = {
             'app_key': appKey, 'method': OFFICIAL_API_METHOD, 'sign_method': 'hmac-sha256',
             'timestamp': String(Date.now()), 'keywords': searchApiQuery, 'tracking_id': trackingId,
