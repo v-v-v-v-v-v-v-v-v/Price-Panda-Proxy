@@ -1,4 +1,4 @@
-// api/proxy.js - FINAL "Dumb Proxy" Version (NO Rate Limiter)
+// api/proxy.js - FINAL "Dumb Proxy" Version (NO ranking)
 
 import crypto from 'crypto';
 
