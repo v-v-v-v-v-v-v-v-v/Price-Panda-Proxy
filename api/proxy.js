@@ -1,4 +1,4 @@
-// api/proxy.js - Updated to handle currency selection
+// api/proxy.js - UPDATED with logging
 
 import crypto from 'crypto';
 
@@ -12,8 +12,6 @@ function generateAliexpressSignature(params, secretKey) {
 }
 
 export default async function handler(request, response) {
-    // It's better to be specific with the origin, but for extensions, this is often needed.
-    // Make sure your manifest host_permissions includes your Vercel URL.
     response.setHeader('Access-Control-Allow-Origin', '*'); 
     response.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
     response.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -26,17 +24,19 @@ export default async function handler(request, response) {
     }
 
     try {
-        // 1. EXTRACT THE PAYLOAD, NOW INCLUDING targetCurrency
+        // *** CHECKPOINT 4: See what the proxy received ***
+        console.log("PROXY: Received request body ->", request.body);
+
         const { keywords, categoryId, targetCurrency } = request.body;
         const appKey = process.env.ALIEXPRESS_APP_KEY;
         const secretKey = process.env.ALIEXPRESS_SECRET_KEY;
         const trackingId = process.env.ALIEXPRESS_TRACKING_ID || "default";
 
         if (!keywords || !appKey || !secretKey) {
+            console.error("PROXY: Missing required parameters or server keys.");
             return response.status(400).json({ error: "Missing required parameters from client or server keys." });
         }
         
-        // 2. BUILD THE PARAMS FOR THE ALIEXPRESS API
         const params = {
             'app_key': appKey,
             'method': OFFICIAL_API_METHOD,
@@ -45,7 +45,7 @@ export default async function handler(request, response) {
             'keywords': keywords,
             'tracking_id': trackingId,
             'target_language': 'en',
-            'target_currency': targetCurrency || 'USD', // Use provided currency or default to USD
+            'target_currency': targetCurrency || 'USD',
             'page_size': '50',
             'sort': 'BEST_MATCH'
         };
@@ -54,6 +54,8 @@ export default async function handler(request, response) {
         }
         params.sign = generateAliexpressSignature(params, secretKey);
 
+        console.log(`PROXY: Calling AliExpress API with currency: ${params.target_currency}`);
+
         const apiResponse = await fetch(OFFICIAL_API_GATEWAY, {
             method: 'POST',
             headers: { 'Content-Type': 'application/x-form-urlencoded;charset=utf-8' },
@@ -61,21 +63,19 @@ export default async function handler(request, response) {
         });
 
         if (!apiResponse.ok) {
-            // Forward more detail from the API if possible
             const errorBody = await apiResponse.text();
-            console.error("AliExpress API Error:", errorBody);
+            console.error("PROXY: AliExpress API Error:", errorBody);
             throw new Error(`AliExpress API request failed with status: ${apiResponse.status}`);
         }
 
         const data = await apiResponse.json();
         const allResults = data.aliexpress_affiliate_product_query_response?.resp_result?.result?.products?.product || [];
 
-        // 3. SEND RAW, UNSORTED RESULTS BACK TO THE CLIENT
-        console.log(`Sending ${allResults.length} raw results back for currency ${params.target_currency}.`);
+        console.log(`PROXY: Sending ${allResults.length} raw results back to extension.`);
         return response.status(200).json({ products: allResults });
 
     } catch (err) {
-        console.error("Critical Server Error:", err.message);
+        console.error("PROXY: Critical Server Error:", err.message);
         return response.status(500).json({ error: "An internal server error occurred." });
     }
 }
