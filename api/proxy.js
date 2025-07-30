@@ -12,21 +12,10 @@ function generateAliexpressSignature(params, secretKey) {
 }
 
 export default async function handler(request, response) {
-    const allowedOrigin = 'chrome-extension://npmlaoacefemkkebjoelmodljehiclan';
-    
-    response.setHeader('Vary', 'Origin');
-    response.setHeader('Access-Control-Allow-Origin', allowedOrigin);
-    response.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-    response.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-
   
-    if (request.method === 'OPTIONS') {
-        return response.status(200).end();
-    }
     
-    if (request.method !== 'POST') {
-        return response.status(405).json({ error: 'Method Not Allowed' });
-    }
+    if (request.method === 'OPTIONS') { return response.status(200).end(); }
+    if (request.method !== 'POST') { return response.status(405).json({ error: 'Method Not Allowed' }); }
 
     try {
         const { keywords, categoryId, targetCurrency } = request.body;
@@ -70,6 +59,7 @@ export default async function handler(request, response) {
         const data = await apiResponse.json();
         const allResults = data.aliexpress_affiliate_product_query_response?.resp_result?.result?.products?.product || [];
 
+        console.log(`Proxy: Found ${allResults.length} results for query "${keywords}" in ${targetCurrency}. Sending back to client.`);
         return response.status(200).json({ products: allResults });
 
     } catch (err) {
