@@ -1,3 +1,5 @@
+// api/proxy.js
+
 import crypto from 'crypto';
 
 const OFFICIAL_API_GATEWAY = "https://api-sg.aliexpress.com/sync";
@@ -10,14 +12,23 @@ function generateAliexpressSignature(params, secretKey) {
 }
 
 export default async function handler(request, response) {
-    response.setHeader('Access-Control-Allow-Origin', 'chrome-extension://npmlaoacefemkkebjoelmodljehiclan');
+    const allowedOrigin = 'chrome-extension://npmlaoacefemkkebjoelmodljehiclan';
+    
+    response.setHeader('Vary', 'Origin');
+    response.setHeader('Access-Control-Allow-Origin', allowedOrigin);
     response.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
     response.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-    if (request.method === 'OPTIONS') { return response.status(200).end(); }
-    if (request.method !== 'POST') { return response.status(405).json({ error: 'Method Not Allowed' }); }
+
+  
+    if (request.method === 'OPTIONS') {
+        return response.status(200).end();
+    }
+    
+    if (request.method !== 'POST') {
+        return response.status(405).json({ error: 'Method Not Allowed' });
+    }
 
     try {
-        
         const { keywords, categoryId, targetCurrency } = request.body;
         const appKey = process.env.ALIEXPRESS_APP_KEY;
         const secretKey = process.env.ALIEXPRESS_SECRET_KEY;
@@ -35,7 +46,6 @@ export default async function handler(request, response) {
             'keywords': keywords,
             'tracking_id': trackingId,
             'target_language': 'en',
-           
             'target_currency': targetCurrency,
             'page_size': '50',
             'sort': 'BEST_MATCH'
@@ -60,7 +70,6 @@ export default async function handler(request, response) {
         const data = await apiResponse.json();
         const allResults = data.aliexpress_affiliate_product_query_response?.resp_result?.result?.products?.product || [];
 
-        console.log(`Proxy: Found ${allResults.length} results for query "${keywords}" in ${targetCurrency}. Sending back to client.`);
         return response.status(200).json({ products: allResults });
 
     } catch (err) {
